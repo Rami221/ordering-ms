@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gardening Store - Orders</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    button.logout { background: #dc3545; color: white; border: none; padding: 10px; cursor: pointer; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 20px; }
+    .card { background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center; }
+    .card img { width: 100%; height: 150px; object-fit: cover; border-radius: 4px; }
+    .card h3 { margin: 10px 0 5px; font-size: 18px; }
+    .card .price { font-size: 16px; font-weight: bold; margin: 10px 0; }
+    .card input { width: 60px; margin-right: 5px; }
+    .card button { background: #28a745; color: white; border: none; padding: 6px 12px; cursor: pointer; }
+    #cart { margin-top: 30px; }
+    #cart h2 { margin-bottom: 10px; }
+    #cart ul { list-style: none; padding: 0; }
+    #cart li { background: #eee; margin: 5px 0; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+    #finishOrder { margin-top: 10px; padding: 10px; background: #007BFF; color: white; border: none; cursor: pointer; }
+    #ordersList h2 { margin-top: 40px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Gardening Store</h1>
+  <button class="logout" onclick="logout()">Logout</button>
+</header>
+
+<div class="grid" id="productsContainer"></div>
+
+<div id="cart">
+  <h2>Cart</h2>
+  <ul id="cartList"></ul>
+  <button id="finishOrder" onclick="finishOrder()">Finish Order</button>
+</div>
+
+<div id="ordersList">
+  <h2>Your Previous Orders</h2>
+  <ul id="orders"></ul>
+</div>
+
+<script>
+  const ORDER_URL = 'http://localhost:3002';
+  const token = localStorage.getItem('jwtToken');
+  if (!token) window.location = 'login.html';
+
+  const products = [
+    { id: 1, name: "Garden Shovel", price: 12.99, image: "https://images.unsplash.com/photo-1605460375648-278bcbd579a6?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 2, name: "Watering Can", price: 18.50, image: "https://images.unsplash.com/photo-1595033883395-2c3faea48c90?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 3, name: "Plant Pots (Set of 3)", price: 25.00, image: "https://images.unsplash.com/photo-1599058917217-4d1c1f9c7a45?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 4, name: "Pruning Shears", price: 15.75, image: "https://images.unsplash.com/photo-1589391886644-2b80eb4de07b?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 5, name: "Garden Gloves", price: 8.99, image: "https://images.unsplash.com/photo-1599211860642-147b7b6c75c8?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 6, name: "Rake", price: 22.50, image: "https://images.unsplash.com/photo-1599103745750-ded3b5b8b58b?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 7, name: "Garden Hose", price: 35.00, image: "https://images.unsplash.com/photo-1603031212791-15e0a5a75aaf?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" },
+    { id: 8, name: "Seed Pack", price: 5.99, image: "https://images.unsplash.com/photo-1596003903356-517bf3f77b8f?crop=entropy&cs=tinysrgb&fit=max&h=150&w=200" }
+  ];
+
+  let cart = [];
+
+  function logout() {
+    localStorage.removeItem('jwtToken');
+    window.location = 'login.html';
+  }
+
+  function renderProducts() {
+    const container = document.getElementById('productsContainer');
+    container.innerHTML = '';
+    products.forEach(p => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <img src="${p.image}" alt="${p.name}">
+        <h3>${p.name}</h3>
+        <div class="price">$${p.price.toFixed(2)}</div>
+        <input type="number" min="1" value="1" id="qty-${p.id}">
+        <button onclick="addToCart(${p.id})">Add to Cart</button>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  function addToCart(productId) {
+    const qty = parseInt(document.getElementById(`qty-${productId}`).value);
+    const product = products.find(p => p.id === productId);
+    const existing = cart.find(item => item.id === productId);
+    if (existing) existing.quantity += qty;
+    else cart.push({ id: product.id, item: product.name, quantity: qty });
+    renderCart();
+  }
+
+  function renderCart() {
+    const list = document.getElementById('cartList');
+    list.innerHTML = '';
+    cart.forEach(c => {
+      const li = document.createElement('li');
+      li.textContent = `${c.item} x${c.quantity}`;
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = 'Remove';
+      removeBtn.onclick = () => { cart = cart.filter(i => i.id !== c.id); renderCart(); };
+      li.appendChild(removeBtn);
+      list.appendChild(li);
+    });
+  }
+
+  async function finishOrder() {
+    if (cart.length === 0) { alert("Cart is empty"); return; }
+
+    const res = await fetch(`${ORDER_URL}/order`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({ orders: cart }) // Send array
+    });
+
+    const data = await res.json();
+    if (data.error) alert(data.error);
+    else alert("Orders submitted successfully!");
+    
+    cart = [];
+    renderCart();
+    getOrders();
+  }
+
+  async function getOrders() {
+    const res = await fetch(`${ORDER_URL}/orders`, {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    const data = await res.json();
+    const ordersList = document.getElementById('orders');
+    ordersList.innerHTML = '';
+    data.forEach(order => {
+      const li = document.createElement('li');
+      li.textContent = `${order.item} x${order.quantity}`;
+      ordersList.appendChild(li);
+    });
+  }
+
+  (async () => {
+    renderProducts();
+    await getOrders();
+  })();
+</script>
+</body>
+</html>
