@@ -1,22 +1,39 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKERHUB_CREDENTIALS = credentials('b50be508-3811-4971-abb5-16cf45a275b7')
+        IMAGE_AUTH = "rami223/auth-service:latest"
+        IMAGE_ORDER = "rami223/order-service:latest"
+    }
+
     stages {
-        stage('Build') {
+        stage('Checkout Code') {
             steps {
-                echo 'Building the app...'
+                git url: 'https://github.com/Rami221/ordering-ms.git', branch: 'main'
             }
         }
 
-        stage('Test') {
+        stage('Build Docker Images') {
             steps {
-                echo 'Running tests...'
+                sh 'docker build -t $IMAGE_AUTH ./auth-service'
+                sh 'docker build -t $IMAGE_ORDER ./order-service'
             }
         }
 
-        stage('Deploy') {
+        stage('Push Images to Docker Hub') {
             steps {
-                echo 'Deploying the app...'
+                sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+                sh 'docker push $IMAGE_AUTH'
+                sh 'docker push $IMAGE_ORDER'
+            }
+        }
+
+        stage('Deploy to Swarm') {
+            steps {
+                sh '''
+                docker stack deploy -c docker-compose.yml ordering
+                '''
             }
         }
     }

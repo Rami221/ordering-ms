@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  auth-service:
+    image: rami223/auth-service:latest
+    ports:
+      - "3001:3000"
+    depends_on:
+      - auth-mongo
+
+  order-service:
+    image: rami223/order-service:latest
+    ports:
+      - "3002:3000"
+    depends_on:
+      - order-mongo
+
+  auth-mongo:
+    image: mongo:6
+    ports:
+      - "27017:27017"
+    volumes:
+      - auth_data:/data/db
+
+  order-mongo:
+    image: mongo:6
+    ports:
+      - "27018:27017"
+    volumes:
+      - order_data:/data/db
+
+volumes:
+  auth_data:
+  order_data:
