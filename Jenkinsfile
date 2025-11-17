@@ -2,58 +2,58 @@ pipeline {
     agent any
 
     environment {
-        // Load Docker Hub credentials stored in Jenkins
-        DOCKER_CRED = credentials('docker-hub-credentials')
-
-        IMAGE_AUTH = "rami223/auth-service:latest"
-        IMAGE_ORDER = "rami223/order-service:latest"
-        SWARM_MANAGER = "192.168.100.54" // IP of your Docker Swarm manager node
+        // Docker Hub credentials (optional)
+        DOCKER_HUB_CREDENTIALS = 'dockerhub-creds'
+        DOCKER_REGISTRY = 'rami223'
+        STACK_NAME = 'ordering'
+        COMPOSE_FILE = 'docker-compose.yml'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                echo "📦 Checking out code from GitHub..."
-                git branch: 'main', url: 'https://github.com/Rami221/ordering-ms.git'
+                git url: 'https://github.com/Rami221/ordering-ms.git', branch: 'main'
             }
         }
 
         stage('Build Docker Images') {
             steps {
-                echo "🐳 Building Docker images..."
-                sh "docker build -t ${IMAGE_AUTH} ./auth-service"
-                sh "docker build -t ${IMAGE_ORDER} ./order-service"
+                script {
+                    sh 'docker build -t rami223/auth-service:latest ./auth-service'
+                    sh 'docker build -t rami223/order-service:latest ./order-service'
+                }
             }
         }
 
-        stage('Push Images to Docker Hub') {
+        stage('Push to Docker Hub (Optional)') {
             steps {
-                echo "🚀 Pushing Docker images to Docker Hub..."
-                sh "echo ${DOCKER_CRED_PSW} | docker login -u ${DOCKER_CRED_USR} --password-stdin"
-                sh "docker push ${IMAGE_AUTH}"
-                sh "docker push ${IMAGE_ORDER}"
+                withCredentials([usernamePassword(credentialsId: "${DOCKER_HUB_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh 'docker push rami223/auth-service:latest'
+                    sh 'docker push rami223/order-service:latest'
+                }
             }
         }
 
-        stage('Deploy to Docker Swarm') {
+        stage('Deploy Docker Stack') {
             steps {
-                echo "🌀 Updating services on Docker Swarm..."
-                sh """
-                    ssh -o StrictHostKeyChecking=no kali@${SWARM_MANAGER} '
-                        docker service update --image ${IMAGE_AUTH} ordering_auth-service || docker service create --name ordering_auth-service ${IMAGE_AUTH};
-                        docker service update --image ${IMAGE_ORDER} ordering_order-service || docker service create --name ordering_order-service ${IMAGE_ORDER};
-                    '
-                """
+                script {
+                    // Remove existing stack if any
+                    sh "docker stack rm ${STACK_NAME} || true"
+                    sleep 5
+                    // Deploy new stack
+                    sh "docker stack deploy -c ${COMPOSE_FILE} ${STACK_NAME}"
+                }
             }
         }
     }
 
     post {
         success {
-            echo "✅ CI/CD pipeline completed successfully. Swarm services updated."
+            echo 'Pipeline finished successfully!'
         }
         failure {
-            echo "❌ Pipeline failed. Please check Jenkins logs for more details."
+            echo 'Pipeline failed!'
         }
     }
 }
