@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   auth-service:
-    image: rami223/auth-service:latest
+    build: ./auth-service
     ports:
       - "3001:3000"
     depends_on:
       - auth-mongo
 
   order-service:
-    image: rami223/order-service:latest
+    build: ./order-service
     ports:
       - "3002:3000"
     depends_on:

@@ -48,5 +48,5 @@ app.post('/login', async (req, res) => {
   res.json({ token });
 });
 
-const PORT = 3001;
-app.listen(PORT, () => console.log(`Auth service running on port ${PORT}`));
+const PORT = 3000; // container port
+app.listen(PORT, '0.0.0.0', () => console.log(`Auth service running on port ${PORT}`));

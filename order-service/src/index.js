@@ -57,4 +57,5 @@ app.get('/orders', authenticateToken, async (req, res) => {
   res.json(orders);
 });
 
-app.listen(3002, () => console.log('Order service running on port 3002'));
+const PORT = 3000; // container port
+app.listen(PORT, '0.0.0.0', () => console.log('Order service running on port 3000'));
